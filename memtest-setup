@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# package name
+PNAME="memtest86+"
+
+# executable
+ENAME="elf-memtest86+"
+
+if [ -d /sys/firmware/efi ]; then
+    echo "memtest86+ does not support EFI platforms."
+    exit 254
+fi
+
+MTVERSION=`rpm -q --qf '%{version}' $PNAME`
+MTPATH="/boot/$ENAME-$MTVERSION"
+
+MENT=`cat /boot/grub/grub.conf | grep "$ENAME-$MTVERSION"` &> /dev/null
+if [ "$MENT" != "" ]; then
+    echo "$MTPATH is already configured.  Exiting..."
+    exit 0
+fi
+
+if [ ! -f $MTPATH ]; then
+    echo "ERROR: $MTPATH does not exist."
+    exit 255
+fi
+
+/sbin/new-memtest-pkg --install $MTVERSION --banner="Memtest86+"
+RETVAL="$?"
+
+if [ "$RETVAL" != "0" ]; then
+    echo "ERROR: grubby failed to configure your bootloader for $MTPATH."
+    exit $RETVAL
+else
+    sed -i -e"s,kernel \(/boot\)\?/$ENAME,kernel --type=netbsd \1/$ENAME," /boot/grub/grub.conf
+    sed -i -e"s,/$ENAME-$MTVERSION.*,/$ENAME-$MTVERSION," /boot/grub/grub.conf
+fi
+
+echo "Setup complete."
